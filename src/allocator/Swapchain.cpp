@@ -8,18 +8,18 @@ using namespace Hyprutils::Memory;
 using namespace Hyprutils::Math;
 #define SP CSharedPointer
 
-SP<CSwapchain> Aquamarine::CSwapchain::create(SP<IAllocator> allocator_, SP<IBackendImplementation> backendImpl_) {
-    auto p  = SP<CSwapchain>(new CSwapchain(allocator_, backendImpl_));
+SP<CLegacySwapchain> Aquamarine::ISwapchain::createLegacy(SP<IAllocator> allocator_, SP<IBackendImplementation> backendImpl_) {
+    auto p  = SP<CLegacySwapchain>(new CLegacySwapchain(allocator_, backendImpl_));
     p->self = p;
     return p;
 }
 
-Aquamarine::CSwapchain::CSwapchain(SP<IAllocator> allocator_, SP<IBackendImplementation> backendImpl_) : allocator(allocator_), backendImpl(backendImpl_) {
+Aquamarine::CLegacySwapchain::CLegacySwapchain(SP<IAllocator> allocator_, SP<IBackendImplementation> backendImpl_) : allocator(allocator_), backendImpl(backendImpl_) {
     if (!allocator || !backendImpl)
         return;
 }
 
-bool Aquamarine::CSwapchain::reconfigure(const SSwapchainOptions& options_) {
+bool Aquamarine::CLegacySwapchain::reconfigure(const SSwapchainOptions& options_) {
     if (!allocator)
         return false;
 
@@ -59,7 +59,7 @@ bool Aquamarine::CSwapchain::reconfigure(const SSwapchainOptions& options_) {
     return true;
 }
 
-SP<IBuffer> Aquamarine::CSwapchain::next(int* age) {
+SP<IBuffer> Aquamarine::CLegacySwapchain::next(int* age) {
     if (!allocator || options.length <= 0)
         return nullptr;
 
@@ -71,7 +71,7 @@ SP<IBuffer> Aquamarine::CSwapchain::next(int* age) {
     return buffers.at(lastAcquired);
 }
 
-bool Aquamarine::CSwapchain::fullReconfigure(const SSwapchainOptions& options_) {
+bool Aquamarine::CLegacySwapchain::fullReconfigure(const SSwapchainOptions& options_) {
     std::vector<Hyprutils::Memory::CSharedPointer<IBuffer>> bfs;
     bfs.reserve(options_.length);
 
@@ -91,7 +91,7 @@ bool Aquamarine::CSwapchain::fullReconfigure(const SSwapchainOptions& options_) 
     return true;
 }
 
-bool Aquamarine::CSwapchain::resize(size_t newSize) {
+bool Aquamarine::CLegacySwapchain::resize(size_t newSize) {
     if (newSize == buffers.size())
         return true;
 
@@ -114,20 +114,24 @@ bool Aquamarine::CSwapchain::resize(size_t newSize) {
     return true;
 }
 
-bool Aquamarine::CSwapchain::contains(SP<IBuffer> buffer) {
+bool Aquamarine::CLegacySwapchain::contains(SP<IBuffer> buffer) {
     return std::ranges::find(buffers, buffer) != buffers.end();
 }
 
-const SSwapchainOptions& Aquamarine::CSwapchain::currentOptions() {
+const SSwapchainOptions& Aquamarine::CLegacySwapchain::currentOptions() {
     return options;
 }
 
-void Aquamarine::CSwapchain::rollback() {
+void Aquamarine::CLegacySwapchain::rollback() {
     lastAcquired--;
     if (lastAcquired < 0)
         lastAcquired = options.length - 1;
 }
 
-SP<IAllocator> Aquamarine::CSwapchain::getAllocator() {
+SP<IAllocator> Aquamarine::CLegacySwapchain::getAllocator() {
     return allocator;
+}
+
+Aquamarine::ISwapchain::~ISwapchain() {
+    ; // nothing to do
 }

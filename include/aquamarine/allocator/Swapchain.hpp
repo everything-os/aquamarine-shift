@@ -14,32 +14,45 @@ namespace Aquamarine {
         bool                      scanout = false, cursor = false /* requires scanout = true */, multigpu = false /* if true, will force linear */;
         Hyprutils::Memory::CWeakPointer<IOutput> scanoutOutput;
     };
-
-    class CSwapchain {
+    class CLegacySwapchain;
+    class ISwapchain {
       public:
-        static Hyprutils::Memory::CSharedPointer<CSwapchain> create(Hyprutils::Memory::CSharedPointer<IAllocator>             allocator_,
+        static Hyprutils::Memory::CSharedPointer<CLegacySwapchain> createLegacy(Hyprutils::Memory::CSharedPointer<IAllocator>             allocator_,
                                                                     Hyprutils::Memory::CSharedPointer<IBackendImplementation> backendImpl_);
 
-        bool                                                 reconfigure(const SSwapchainOptions& options_);
+        virtual bool                                                 reconfigure(const SSwapchainOptions& options_) = 0;
 
+        virtual Hyprutils::Memory::CSharedPointer<IBuffer>           next(int* age) = 0;
+        virtual const SSwapchainOptions&                             currentOptions() = 0;
+
+        // rolls the buffers back, marking the last consumed as the next valid.
+        // useful if e.g. a commit fails and we don't wanna write to the previous buffer that is
+        // in use.
+        virtual void rollback() = 0;
+        virtual ~ISwapchain();
+    };
+    class CLegacySwapchain: public ISwapchain {
+      public:
         bool                                                 contains(Hyprutils::Memory::CSharedPointer<IBuffer> buffer);
-        Hyprutils::Memory::CSharedPointer<IBuffer>           next(int* age);
-        const SSwapchainOptions&                             currentOptions();
+        virtual bool                                                 reconfigure(const SSwapchainOptions& options_);
+
+        virtual Hyprutils::Memory::CSharedPointer<IBuffer>           next(int* age);
+        virtual const SSwapchainOptions&                             currentOptions();
         Hyprutils::Memory::CSharedPointer<IAllocator>        getAllocator();
 
         // rolls the buffers back, marking the last consumed as the next valid.
         // useful if e.g. a commit fails and we don't wanna write to the previous buffer that is
         // in use.
-        void rollback();
+        virtual void rollback();
 
       private:
-        CSwapchain(Hyprutils::Memory::CSharedPointer<IAllocator> allocator_, Hyprutils::Memory::CSharedPointer<IBackendImplementation> backendImpl_);
+        CLegacySwapchain(Hyprutils::Memory::CSharedPointer<IAllocator> allocator_, Hyprutils::Memory::CSharedPointer<IBackendImplementation> backendImpl_);
 
         bool fullReconfigure(const SSwapchainOptions& options_);
         bool resize(size_t newSize);
 
         //
-        Hyprutils::Memory::CWeakPointer<CSwapchain>             self;
+        Hyprutils::Memory::CWeakPointer<CLegacySwapchain>             self;
         SSwapchainOptions                                       options;
         Hyprutils::Memory::CSharedPointer<IAllocator>           allocator;
         Hyprutils::Memory::CWeakPointer<IBackendImplementation> backendImpl;
@@ -47,5 +60,6 @@ namespace Aquamarine {
         int                                                     lastAcquired = 0;
 
         friend class CGBMBuffer;
+        friend class ISwapchain;
     };
 };

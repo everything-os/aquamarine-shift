@@ -10,7 +10,21 @@
 #include <xdg-shell.hpp>
 #include <linux-dmabuf-v1.hpp>
 #include <tuple>
-
+// This is a bit of a hack but essentially allows for hyprland to use this header even when using the server side version of linux-dmabuf-v1.hpp header
+class CCWlSurface;
+class CCXdgSurface;
+class CCXdgToplevel;
+class CCWlCallback;
+class CCWlKeyboard;
+class CCWlPointer;
+class CCWlRegistry;
+class CCWlSeat;
+class CCWlShm;
+class CCWlCompositor;
+class CCZwpLinuxDmabufFeedbackV1;
+class CCZwpLinuxDmabufV1;
+class CCXdgWmBase;
+class CCWlBuffer;
 namespace Aquamarine {
     class CBackend;
     class CWaylandBackend;
@@ -133,7 +147,7 @@ namespace Aquamarine {
         virtual void                                                       onReady();
         virtual std::vector<SDRMFormat>                                    getRenderFormats();
         virtual std::vector<SDRMFormat>                                    getCursorFormats();
-        virtual bool                                                       createOutput(const std::string& name = "");
+        bool                                                       createOutput(const std::string& name = "");
         virtual Hyprutils::Memory::CSharedPointer<IAllocator>              preferredAllocator();
         virtual std::vector<Hyprutils::Memory::CSharedPointer<IAllocator>> getAllocators();
         virtual Hyprutils::Memory::CWeakPointer<IBackendImplementation>    getPrimary();

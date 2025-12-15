@@ -1,13 +1,221 @@
+#include "Shared.hpp"
+#include "aquamarine/allocator/Swapchain.hpp"
+#include "aquamarine/backend/Misc.hpp"
+#include "aquamarine/buffer/Buffer.hpp"
+#include "aquamarine/output/Output.hpp"
 #include <aquamarine/backend/Tab.hpp>
+#include <aquamarine/backend/Backend.hpp>
+#include <aquamarine/input/Input.hpp>
+#include <cstdlib>
+#include <drm_fourcc.h>
+
+extern "C" {
+#include <tab_client.h>
+}
 
 using namespace Aquamarine;
 using namespace Hyprutils::Memory;
 using namespace Hyprutils::Math;
 #define SP CSharedPointer
 
-Aquamarine::CTabOutput::CTabOutput(const std::string& name_, CWeakPointer<CTabBackend> backend_) : backend(backend_) {
-    name = name_;
+class CTabKeyboard : public IKeyboard {
+  public:
+    CTabKeyboard() {
+        ;
+    }
 
+    virtual const std::string& getName() {
+        static const std::string name = "tab-keyboard";
+        return name;
+    }
+
+    virtual libinput_device* getLibinputHandle() {
+        return nullptr;
+    }
+
+    virtual void updateLEDs(uint32_t leds) {
+        ;
+    }
+};
+
+class CTabPointer : public IPointer {
+  public:
+    CTabPointer() {
+        ;
+    }
+
+    virtual const std::string& getName() {
+        static const std::string name = "tab-pointer";
+        return name;
+    }
+
+    virtual libinput_device* getLibinputHandle() {
+        return nullptr;
+    }
+};
+
+class CTabTouch : public ITouch {
+  public:
+    CTabTouch() {
+        ;
+    }
+
+    virtual const std::string& getName() {
+        static const std::string name = "tab-touch";
+        return name;
+    }
+
+    virtual libinput_device* getLibinputHandle() {
+        return nullptr;
+    }
+};
+
+class CTabTabletTool : public ITabletTool {
+  public:
+    CTabTabletTool() {
+        ;
+    }
+
+    virtual const std::string& getName() {
+        static const std::string name = "tab-tablet-tool";
+        return name;
+    }
+
+    virtual libinput_device* getLibinputHandle() {
+        return nullptr;
+    }
+};
+
+class CTabTablet : public ITablet {
+  public:
+    CTabTablet() {
+        ;
+    }
+
+    virtual const std::string& getName() {
+        static const std::string name = "tab-tablet";
+        return name;
+    }
+
+    virtual libinput_device* getLibinputHandle() {
+        return nullptr;
+    }
+};
+
+class CTabSwitch : public ISwitch {
+  public:
+    CTabSwitch() {
+        ;
+    }
+
+    virtual const std::string& getName() {
+        static const std::string name = "tab-switch";
+        return name;
+    }
+
+    virtual libinput_device* getLibinputHandle() {
+        return nullptr;
+    }
+};
+
+class CTabBuffer : public IBuffer {
+    private:
+        TabFrameTarget target;
+    public:
+        CTabBuffer(const TabFrameTarget& target_) : target(target_) {
+            ;
+        }
+        virtual ~CTabBuffer() {
+            ;
+        }
+        virtual eBufferType type() {
+            return eBufferType::BUFFER_TYPE_DMABUF;
+        }
+        virtual eBufferCapability caps() {
+            return eBufferCapability::BUFFER_CAPABILITY_NONE;
+        }
+        virtual void update(const Hyprutils::Math::CRegion& damage) {
+            ;
+        }
+        virtual bool good() {
+            return true;
+        }
+        virtual SDMABUFAttrs dmabuf() {
+            SDMABUFAttrs attrs;
+            attrs.success = true;
+            attrs.size = Hyprutils::Math::Vector2D{(double)target.width, (double)target.height};
+            attrs.format = target.dmabuf.fourcc;
+            attrs.modifier = DRM_FORMAT_MOD_INVALID;
+            attrs.strides[0] = target.dmabuf.stride;
+            attrs.offsets[0] = target.dmabuf.offset;
+            attrs.fds[0] = target.dmabuf.fd;
+            return attrs;
+        }
+        virtual bool isSynchronous() {
+            return false;
+        }
+};
+
+class CTabSwapchain : public ISwapchain {
+    public:
+        SSwapchainOptions options;
+        TabClientHandle* tab_client;
+        std::string monitor_id;
+        virtual bool                                                 reconfigure(const SSwapchainOptions& options_) {
+            
+            // ignore
+            return true;
+        };
+
+        virtual Hyprutils::Memory::CSharedPointer<IBuffer> next(int* age) {
+            TabFrameTarget target;
+            TabAcquireResult acquire_status = TAB_ACQUIRE_NO_BUFFERS;
+            while (acquire_status == TAB_ACQUIRE_NO_BUFFERS) {
+                acquire_status = tab_client_acquire_frame(tab_client, monitor_id.c_str(), &target);
+                if(acquire_status == TAB_ACQUIRE_NO_BUFFERS) {
+                    tab_client_poll_events(tab_client);
+                }
+            }
+            if(acquire_status != TAB_ACQUIRE_OK) {
+                return nullptr;
+            }
+            return Hyprutils::Memory::CSharedPointer<IBuffer>(new CTabBuffer(target));
+        };
+        virtual const SSwapchainOptions&                             currentOptions() {
+            return options;
+        };
+        
+
+        // rolls the buffers back, marking the last consumed as the next valid.
+        // useful if e.g. a commit fails and we don't wanna write to the previous buffer that is
+        // in use.
+        virtual void rollback() {
+
+        };
+        CTabSwapchain(const TabMonitorInfo& monitor_info, TabClientHandle* tab_client) {
+            TabFrameTarget target;
+            tab_client_acquire_frame(tab_client, monitor_id.c_str(), &target);
+            options = SSwapchainOptions {
+                .length = 2,
+                .size = {monitor_info.width, monitor_info.height},
+                .format = target.dmabuf.fourcc,
+                .scanout = false,
+                .cursor = false,
+                .multigpu = false
+            };
+            this->tab_client = tab_client;
+            this->monitor_id = std::string(monitor_info.id);
+        };
+        ~CTabSwapchain() {
+            ;
+        }
+};
+Aquamarine::CTabOutput::CTabOutput(const TabMonitorInfo& monitor_info, Hyprutils::Memory::CWeakPointer<CTabBackend> backend_) : backend(backend_) {
+    this->name = std::string(monitor_info.name);
+    this->physicalSize = {(double)monitor_info.width, (double)monitor_info.height};
+    this->swapchain = Hyprutils::Memory::CSharedPointer<ISwapchain>(new CTabSwapchain(monitor_info, backend.lock()->m_pClient));
+    this->monitor_id = std::string(monitor_info.id);
+    this->modes.emplace_back(Hyprutils::Memory::CSharedPointer<SOutputMode>(new SOutputMode(Vector2D{(double)monitor_info.width, (double)monitor_info.height}, 60, true)));
     framecb = makeShared<std::function<void()>>([this]() {
         frameScheduled = false;
         events.frame.emit();
@@ -19,11 +227,12 @@ Aquamarine::CTabOutput::~CTabOutput() {
     events.destroy.emit();
 }
 
+
 bool Aquamarine::CTabOutput::commit() {
     events.commit.emit();
     state->onCommit();
     needsFrame = false;
-    events.present.emit(IOutput::SPresentEvent{.presented = true});
+    tab_client_swap_buffers(backend->m_pClient, this->monitor_id.c_str());
     return true;
 }
 
@@ -47,7 +256,7 @@ void Aquamarine::CTabOutput::scheduleFrame(const scheduleFrameReason reason) {
 
 bool Aquamarine::CTabOutput::destroy() {
     events.destroy.emit();
-    std::erase(backend.lock()->outputs, self.lock());
+    std::erase_if(backend.lock()->outputs, [this](const auto& other) { return other.get() == this; });
     return true;
 }
 
@@ -58,7 +267,8 @@ std::vector<SDRMFormat> Aquamarine::CTabOutput::getRenderFormats() {
 }
 
 Aquamarine::CTabBackend::~CTabBackend() {
-    ;
+    if (m_pClient)
+        tab_client_disconnect(m_pClient);
 }
 
 Aquamarine::CTabBackend::CTabBackend(SP<CBackend> backend_) : backend(backend_) {
@@ -70,26 +280,100 @@ eBackendType Aquamarine::CTabBackend::type() {
 }
 
 bool Aquamarine::CTabBackend::start() {
+
+    if(!m_pClient) m_pClient = tab_client_connect_default(std::getenv("SHIFT_SESSION_TOKEN"));
+    if (!m_pClient) {
+        std::cout << "tab backend: Client failed to connect\n";
+        return false;
+    }
+
+    std::cout << "tab backend: Client connected successfully.\n";
+
+    for (size_t i = 0; i < tab_client_get_monitor_count(m_pClient); ++i) {
+        char* mon_id = tab_client_get_monitor_id(m_pClient, i);
+        auto monitor_info = tab_client_get_monitor_info(m_pClient, mon_id);
+        createOutput(&monitor_info);
+        tab_client_free_monitor_info(&monitor_info);
+        tab_client_string_free(mon_id);
+    }
+
+    backend.lock()->events.pollFDsChanged.emit();
+
     return true;
 }
 
 std::vector<SP<SPollFD>> Aquamarine::CTabBackend::pollFDs() {
-    return {};
+    if (!m_pClient)
+        return {};
+
+    return {{SP<SPollFD>(new SPollFD{.fd=tab_client_get_socket_fd(m_pClient), .onSignal=[this]() { dispatchEvents(); }}),
+             SP<SPollFD>(new SPollFD{.fd=tab_client_get_swap_fd(m_pClient), .onSignal=[this]() { dispatchEvents(); }})}};
 }
 
 int Aquamarine::CTabBackend::drmFD() {
-    return -1;
+    return tab_client_drm_fd(m_pClient);
 }
 
 int Aquamarine::CTabBackend::drmRenderNodeFD() {
-    return -1;
+    return tab_client_drm_fd(m_pClient);
 }
 
 bool Aquamarine::CTabBackend::dispatchEvents() {
+    if (!m_pClient)
+        return true;
+
+    tab_client_poll_events(m_pClient);
+
+    TabEvent event;
+    while (tab_client_next_event(m_pClient, &event)) {
+        switch (event.event_type) {
+            case TAB_EVENT_FRAME_DONE: {
+                std::cout << "[tab backend] Frame done for monitor " << event.data.frame_done << "\n";
+                auto mon_id = event.data.frame_done;
+                for (auto& output : outputs) {
+                    if (output->monitor_id == mon_id) {
+                        output->events.present.emit(IOutput::SPresentEvent{.presented = true});
+                        break;
+                    }
+                }
+                tab_client_string_free(mon_id);
+                break;
+            }
+            case TabEventType::TAB_EVENT_MONITOR_ADDED: {
+                auto mon = event.data.monitor_added;
+                backend.lock()->log(AQ_LOG_TRACE, std::format("tab backend: Monitor {} added", mon.id));
+                createOutput(&mon);
+                tab_client_free_monitor_info(&mon);
+                break;
+            }
+            case TabEventType::TAB_EVENT_MONITOR_REMOVED: {
+                auto mon_id = event.data.monitor_removed;
+                backend.lock()->log(AQ_LOG_TRACE, std::format("tab backend: Monitor {} removed", mon_id));
+                // find and remove the output
+                std::erase_if(outputs, [&](const auto& output) {
+                    if (output->name == mon_id) {
+                        output->destroy();
+                        return true;
+                    }
+                    return false;
+                });
+                tab_client_string_free(mon_id);
+                break;
+            }
+            case TabEventType::TAB_EVENT_INPUT: {
+                handleInput(&event.data.input);
+                break;
+            }
+            default:
+                backend.lock()->log(AQ_LOG_DEBUG, std::format("tab backend: Got an unhandled event of type {}", (int)event.event_type));
+                break;
+        }
+    }
     return true;
 }
 
 uint32_t Aquamarine::CTabBackend::capabilities() {
+    
     return 0;
 }
 
@@ -101,24 +385,196 @@ void Aquamarine::CTabBackend::onReady() {
     ;
 }
 
+
+
+void Aquamarine::CTabBackend::handleInput(TabInputEvent* event) {
+    switch (event->kind) {
+        case TAB_INPUT_KIND_KEY: {
+            if (!m_pKeyboard) {
+                m_pKeyboard = SP<CTabKeyboard>(new CTabKeyboard());
+                backend.lock()->events.newKeyboard.emit(m_pKeyboard);
+            }
+            auto& key = event->data.key;
+            m_pKeyboard->events.key.emit(IKeyboard::SKeyEvent{
+                .timeMs  = (uint32_t)(key.time_usec / 1000),
+                .key     = key.key,
+                .pressed = key.state == TabKeyState::TAB_KEY_PRESSED,
+            });
+            break;
+        }
+        case TAB_INPUT_KIND_POINTER_BUTTON: {
+            if (!m_pPointer) {
+                m_pPointer = SP<CTabPointer>(new CTabPointer());
+                backend.lock()->events.newPointer.emit(m_pPointer);
+            }
+            auto& button = event->data.pointer_button;
+            m_pPointer->events.button.emit(IPointer::SButtonEvent{
+                .timeMs  = (uint32_t)(button.time_usec / 1000),
+                .button  = button.button,
+                .pressed = button.state == TabButtonState::TAB_BUTTON_PRESSED,
+            });
+            break;
+        }
+        case TAB_INPUT_KIND_POINTER_MOTION: {
+            if (!m_pPointer) {
+                m_pPointer = SP<CTabPointer>(new CTabPointer());
+                backend.lock()->events.newPointer.emit(m_pPointer);
+            }
+            auto& motion = event->data.pointer_motion;
+            m_pPointer->events.move.emit(IPointer::SMoveEvent{
+                .timeMs = (uint32_t)(motion.time_usec / 1000),
+                .delta  = {motion.dx, motion.dy},
+            });
+            break;
+        }
+        case TAB_INPUT_KIND_TOUCH_DOWN: {
+            if (!m_pTouch) {
+                m_pTouch = SP<CTabTouch>(new CTabTouch());
+                backend.lock()->events.newTouch.emit(m_pTouch);
+            }
+            auto& touch = event->data.touch_down;
+            m_pTouch->events.down.emit(ITouch::SDownEvent{
+                .timeMs  = (uint32_t)(touch.time_usec / 1000),
+                .touchID = touch.contact.id,
+                .pos     = {touch.contact.x, touch.contact.y},
+            });
+            break;
+        }
+        case TAB_INPUT_KIND_TOUCH_UP: {
+            if (!m_pTouch) {
+                m_pTouch = SP<CTabTouch>(new CTabTouch());
+                backend.lock()->events.newTouch.emit(m_pTouch);
+            }
+            auto& touch = event->data.touch_up;
+            m_pTouch->events.up.emit(ITouch::SUpEvent{
+                .timeMs  = (uint32_t)(touch.time_usec / 1000),
+                .touchID = touch.contact_id,
+            });
+            break;
+        }
+        case TAB_INPUT_KIND_TOUCH_MOTION: {
+            if (!m_pTouch) {
+                m_pTouch = SP<CTabTouch>(new CTabTouch());
+                backend.lock()->events.newTouch.emit(m_pTouch);
+            }
+            auto& touch = event->data.touch_motion;
+            m_pTouch->events.move.emit(ITouch::SMotionEvent{
+                .timeMs  = (uint32_t)(touch.time_usec / 1000),
+                .touchID = touch.contact.id,
+                .pos     = {touch.contact.x, touch.contact.y},
+            });
+            break;
+        }
+        case TAB_INPUT_KIND_TABLET_TOOL_AXIS: {
+            if (!m_pTablet) {
+                m_pTablet = SP<CTabTablet>(new CTabTablet());
+                backend.lock()->events.newTablet.emit(m_pTablet);
+            }
+            auto& axis = event->data.tablet_tool_axis;
+            auto  tool = SP<CTabTabletTool>(new CTabTabletTool());
+            m_pTablet->events.axis.emit(ITablet::SAxisEvent{
+                .tool   = tool,
+                .timeMs = (uint32_t)(axis.time_usec / 1000),
+                .absolute = {axis.axes.x, axis.axes.y},
+                .tilt = {axis.axes.tilt_x, axis.axes.tilt_y},
+                .pressure = axis.axes.pressure,
+                .distance = axis.axes.distance,
+                .rotation = axis.axes.rotation,
+            });
+            break;
+        }
+        case TAB_INPUT_KIND_TABLET_TOOL_PROXIMITY: {
+            if (!m_pTablet) {
+                m_pTablet = SP<CTabTablet>(new CTabTablet());
+                backend.lock()->events.newTablet.emit(m_pTablet);
+            }
+            auto& proximity = event->data.tablet_tool_proximity;
+            auto  tool      = SP<CTabTabletTool>(new CTabTabletTool());
+            m_pTablet->events.proximity.emit(ITablet::SProximityEvent{
+                .tool   = tool,
+                .timeMs = (uint32_t)(proximity.time_usec / 1000),
+                .in     = proximity.in_proximity,
+            });
+            break;
+        }
+        case TAB_INPUT_KIND_TABLET_TOOL_TIP: {
+            if (!m_pTablet) {
+                m_pTablet = SP<CTabTablet>(new CTabTablet());
+                backend.lock()->events.newTablet.emit(m_pTablet);
+            }
+            auto& tip  = event->data.tablet_tool_tip;
+            auto  tool = SP<CTabTabletTool>(new CTabTabletTool());
+            m_pTablet->events.tip.emit(ITablet::STipEvent{
+                .tool   = tool,
+                .timeMs = (uint32_t)(tip.time_usec / 1000),
+                .down   = tip.state == TAB_TIP_DOWN,
+            });
+            break;
+        }
+        case TAB_INPUT_KIND_TABLET_TOOL_BUTTON: {
+            if (!m_pTablet) {
+                m_pTablet = SP<CTabTablet>(new CTabTablet());
+                backend.lock()->events.newTablet.emit(m_pTablet);
+            }
+            auto& button = event->data.tablet_tool_button;
+            auto  tool   = SP<CTabTabletTool>(new CTabTabletTool());
+            m_pTablet->events.button.emit(ITablet::SButtonEvent{
+                .tool   = tool,
+                .timeMs = (uint32_t)(button.time_usec / 1000),
+                .button = button.button,
+                .down   = button.state == TAB_BUTTON_PRESSED,
+            });
+            break;
+        }
+        case TAB_INPUT_KIND_SWITCH_TOGGLE: {
+            if (!m_pSwitch) {
+                m_pSwitch = SP<CTabSwitch>(new CTabSwitch());
+                backend.lock()->events.newSwitch.emit(m_pSwitch);
+            }
+            auto& sw = event->data.switch_toggle;
+            m_pSwitch->events.fire.emit(ISwitch::SFireEvent{
+                .timeMs = (uint32_t)(sw.time_usec / 1000),
+                .type = sw.switch_type == TAB_SWITCH_LID ? ISwitch::eSwitchType::AQ_SWITCH_TYPE_LID : ISwitch::eSwitchType::AQ_SWITCH_TYPE_TABLET_MODE,
+                .enable = sw.state == TAB_SWITCH_ON,
+            });
+            break;
+        }
+        default: backend.lock()->log(AQ_LOG_DEBUG, std::format("tab backend: Got an unhandled input event of type {}", (int)event->kind)); break;
+    }
+}
+
 std::vector<SDRMFormat> Aquamarine::CTabBackend::getRenderFormats() {
-    for (const auto& impl : backend.lock()->getImplementations()) {
-        if (impl->type() == AQ_BACKEND_TAB)
-            continue;
-        if (impl->getRenderableFormats().empty())
+    for (const auto& impl : backend->getImplementations()) {
+        if (impl->type() != AQ_BACKEND_DRM || impl->getRenderableFormats().empty())
             continue;
         return impl->getRenderableFormats();
     }
 
-    return {};
+    // formats probably supported by EGL
+    return {SDRMFormat{.drmFormat = DRM_FORMAT_XRGB8888, .modifiers = {DRM_FORMAT_INVALID}},
+            SDRMFormat{.drmFormat = DRM_FORMAT_XBGR8888, .modifiers = {DRM_FORMAT_INVALID}},
+            SDRMFormat{.drmFormat = DRM_FORMAT_RGBX8888, .modifiers = {DRM_FORMAT_INVALID}},
+            SDRMFormat{.drmFormat = DRM_FORMAT_BGRX8888, .modifiers = {DRM_FORMAT_INVALID}},
+            SDRMFormat{.drmFormat = DRM_FORMAT_ARGB8888, .modifiers = {DRM_FORMAT_INVALID}},
+            SDRMFormat{.drmFormat = DRM_FORMAT_ABGR8888, .modifiers = {DRM_FORMAT_INVALID}},
+            SDRMFormat{.drmFormat = DRM_FORMAT_RGBA8888, .modifiers = {DRM_FORMAT_INVALID}},
+            SDRMFormat{.drmFormat = DRM_FORMAT_BGRA8888, .modifiers = {DRM_FORMAT_INVALID}},
+            SDRMFormat{.drmFormat = DRM_FORMAT_XRGB2101010, .modifiers = {DRM_FORMAT_MOD_LINEAR}},
+            SDRMFormat{.drmFormat = DRM_FORMAT_XBGR2101010, .modifiers = {DRM_FORMAT_MOD_LINEAR}},
+            SDRMFormat{.drmFormat = DRM_FORMAT_RGBX1010102, .modifiers = {DRM_FORMAT_MOD_LINEAR}},
+            SDRMFormat{.drmFormat = DRM_FORMAT_BGRX1010102, .modifiers = {DRM_FORMAT_MOD_LINEAR}},
+            SDRMFormat{.drmFormat = DRM_FORMAT_ARGB2101010, .modifiers = {DRM_FORMAT_MOD_LINEAR}},
+            SDRMFormat{.drmFormat = DRM_FORMAT_ABGR2101010, .modifiers = {DRM_FORMAT_MOD_LINEAR}},
+            SDRMFormat{.drmFormat = DRM_FORMAT_RGBA1010102, .modifiers = {DRM_FORMAT_MOD_LINEAR}},
+            SDRMFormat{.drmFormat = DRM_FORMAT_BGRA1010102, .modifiers = {DRM_FORMAT_MOD_LINEAR}}};
 }
 
 std::vector<SDRMFormat> Aquamarine::CTabBackend::getCursorFormats() {
     return {};
 }
 
-bool Aquamarine::CTabBackend::createOutput(const std::string& name) {
-    auto output = SP<CTabOutput>(new CTabOutput(name.empty() ? std::format("TAB-{}", outputIDCounter++) : name, self));
+bool Aquamarine::CTabBackend::createOutput(const TabMonitorInfo* monitor_info) {
+    auto output = SP<CTabOutput>(new CTabOutput(*monitor_info, self));
     output->self = output;
     outputs.emplace_back(output);
 
@@ -128,13 +584,13 @@ bool Aquamarine::CTabBackend::createOutput(const std::string& name) {
 }
 
 SP<IAllocator> Aquamarine::CTabBackend::preferredAllocator() {
-    return backend.lock()->primaryAllocator;
+    return nullptr;
 }
 
 std::vector<SP<IAllocator>> Aquamarine::CTabBackend::getAllocators() {
-    return {backend.lock()->primaryAllocator};
+    return {};
 }
 
 CWeakPointer<IBackendImplementation> Aquamarine::CTabBackend::getPrimary() {
-    return {};
+    return self;
 }

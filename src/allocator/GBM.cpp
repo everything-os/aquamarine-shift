@@ -62,7 +62,7 @@ static SDRMFormat guessFormatFrom(std::vector<SDRMFormat> formats, bool cursor, 
 }
 
 Aquamarine::CGBMBuffer::CGBMBuffer(const SAllocatorBufferParams& params, Hyprutils::Memory::CWeakPointer<CGBMAllocator> allocator_,
-                                   Hyprutils::Memory::CSharedPointer<CSwapchain> swapchain) : allocator(allocator_) {
+                                   Hyprutils::Memory::CSharedPointer<CLegacySwapchain> swapchain) : allocator(allocator_) {
     if (!allocator)
         return;
 
@@ -365,7 +365,7 @@ Aquamarine::CGBMAllocator::CGBMAllocator(int fd_, Hyprutils::Memory::CWeakPointe
     free(drmName_);
 }
 
-SP<IBuffer> Aquamarine::CGBMAllocator::acquire(const SAllocatorBufferParams& params, Hyprutils::Memory::CSharedPointer<CSwapchain> swapchain_) {
+SP<IBuffer> Aquamarine::CGBMAllocator::acquire(const SAllocatorBufferParams& params, Hyprutils::Memory::CSharedPointer<CLegacySwapchain> swapchain_) {
     if (params.size.x < 1 || params.size.y < 1) {
         backend->log(AQ_LOG_ERROR, std::format("Couldn't allocate a gbm buffer with invalid size {}", params.size));
         return nullptr;

@@ -4,6 +4,7 @@
 #include <xdg-shell.hpp>
 #include "Shared.hpp"
 #include "FormatUtils.hpp"
+#include "aquamarine/allocator/Swapchain.hpp"
 #include <cstring>
 #include <xf86drm.h>
 #include <gbm.h>
@@ -148,7 +149,7 @@ bool Aquamarine::CWaylandBackend::createOutput(const std::string& szName) {
     auto o  = outputs.emplace_back(SP<CWaylandOutput>(new CWaylandOutput(szName.empty() ? std::format("WAYLAND-{}", ++lastOutputID) : szName, self)));
     o->self = o;
     if (backend->ready)
-        o->swapchain = CSwapchain::create(backend->primaryAllocator, self.lock());
+        o->swapchain = ISwapchain::createLegacy(backend->primaryAllocator, self.lock());
     idleCallbacks.emplace_back([this, o]() { backend->events.newOutput.emit(SP<IOutput>(o)); });
     return true;
 }
@@ -197,7 +198,7 @@ bool Aquamarine::CWaylandBackend::setCursor(Hyprutils::Memory::CSharedPointer<IB
 
 void Aquamarine::CWaylandBackend::onReady() {
     for (auto const& o : outputs) {
-        o->swapchain = CSwapchain::create(backend->primaryAllocator, self.lock());
+        o->swapchain = ISwapchain::createLegacy(backend->primaryAllocator, self.lock());
         if (!o->swapchain) {
             backend->log(AQ_LOG_ERROR, std::format("Output {} failed: swapchain creation failed", o->name));
             continue;
@@ -618,7 +619,13 @@ SP<IBackendImplementation> Aquamarine::CWaylandOutput::getBackend() {
 }
 
 SP<CWaylandBuffer> Aquamarine::CWaylandOutput::wlBufferFromBuffer(SP<IBuffer> buffer) {
-    std::erase_if(backendState.buffers, [this](const auto& el) { return el.first.expired() || !swapchain->contains(el.first.lock()); });
+    std::erase_if(backendState.buffers, [this](const auto& el) { 
+        auto legacySwapchain =
+            Hyprutils::Memory::dynamicPointerCast<Aquamarine::CLegacySwapchain>(swapchain);
+
+        ASSERT(legacySwapchain != nullptr);
+        return el.first.expired() || !legacySwapchain->contains(el.first.lock());
+    });
 
     for (auto const& [k, v] : backendState.buffers) {
         if (k != buffer)

@@ -188,7 +188,7 @@ namespace Aquamarine {
         std::vector<Hyprutils::Memory::CSharedPointer<SOutputMode>> modes;
         Hyprutils::Memory::CSharedPointer<COutputState>             state = Hyprutils::Memory::makeShared<COutputState>();
 
-        Hyprutils::Memory::CSharedPointer<CSwapchain>               swapchain;
+        Hyprutils::Memory::CSharedPointer<ISwapchain>               swapchain;
 
         //
 

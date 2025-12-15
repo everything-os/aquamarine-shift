@@ -4,11 +4,18 @@
 #include "../allocator/Swapchain.hpp"
 #include "../output/Output.hpp"
 #include <hyprutils/memory/WeakPtr.hpp>
+#include <memory>
+#include <tab_client.h>
 
 namespace Aquamarine {
     class CBackend;
     class CTabBackend;
     class IAllocator;
+    class IKeyboard;
+    class IPointer;
+    class ITouch;
+    class ITablet;
+    class ISwitch;
 
     class CTabOutput : public IOutput {
       public:
@@ -19,16 +26,16 @@ namespace Aquamarine {
         virtual void                                                      scheduleFrame(const scheduleFrameReason reason = AQ_SCHEDULE_UNKNOWN);
         virtual bool                                                      destroy();
         virtual std::vector<SDRMFormat>                                   getRenderFormats();
-
         Hyprutils::Memory::CWeakPointer<CTabOutput>                       self;
 
       private:
-        CTabOutput(const std::string& name_, Hyprutils::Memory::CWeakPointer<CTabBackend> backend_);
+        CTabOutput(const TabMonitorInfo& monitor_info, Hyprutils::Memory::CWeakPointer<CTabBackend> backend);
 
         Hyprutils::Memory::CWeakPointer<CTabBackend> backend;
 
         Hyprutils::Memory::CSharedPointer<std::function<void()>> framecb;
         bool                                                     frameScheduled = false;
+        std::string monitor_id;
 
         friend class CTabBackend;
     };
@@ -46,7 +53,7 @@ namespace Aquamarine {
         virtual void                                                       onReady();
         virtual std::vector<SDRMFormat>                                    getRenderFormats();
         virtual std::vector<SDRMFormat>                                    getCursorFormats();
-        virtual bool                                                       createOutput(const std::string& name = "");
+        bool                                                       createOutput(const TabMonitorInfo* monitor_info);
         virtual Hyprutils::Memory::CSharedPointer<IAllocator>              preferredAllocator();
         virtual std::vector<Hyprutils::Memory::CSharedPointer<IAllocator>> getAllocators();
         virtual Hyprutils::Memory::CWeakPointer<IBackendImplementation>    getPrimary();
@@ -57,8 +64,16 @@ namespace Aquamarine {
       private:
         CTabBackend(Hyprutils::Memory::CSharedPointer<CBackend> backend_);
 
+        void handleInput(TabInputEvent* event);
         Hyprutils::Memory::CWeakPointer<CBackend>                      backend;
         std::vector<Hyprutils::Memory::CSharedPointer<CTabOutput>>     outputs;
+        TabClientHandle*                                               m_pClient = nullptr;
+
+        Hyprutils::Memory::CSharedPointer<IKeyboard>                   m_pKeyboard;
+        Hyprutils::Memory::CSharedPointer<IPointer>                    m_pPointer;
+        Hyprutils::Memory::CSharedPointer<ITouch>                      m_pTouch;
+        Hyprutils::Memory::CSharedPointer<ITablet>                     m_pTablet;
+        Hyprutils::Memory::CSharedPointer<ISwitch>                     m_pSwitch;
 
         size_t                                                         outputIDCounter = 0;
 

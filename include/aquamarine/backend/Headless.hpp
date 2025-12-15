@@ -46,7 +46,7 @@ namespace Aquamarine {
         virtual void                                                       onReady();
         virtual std::vector<SDRMFormat>                                    getRenderFormats();
         virtual std::vector<SDRMFormat>                                    getCursorFormats();
-        virtual bool                                                       createOutput(const std::string& name = "");
+        bool                                                       createOutput(const std::string& name = "");
         virtual Hyprutils::Memory::CSharedPointer<IAllocator>              preferredAllocator();
         virtual std::vector<Hyprutils::Memory::CSharedPointer<IAllocator>> getAllocators();
         virtual Hyprutils::Memory::CWeakPointer<IBackendImplementation>    getPrimary();

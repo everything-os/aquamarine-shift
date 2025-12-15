@@ -5,6 +5,7 @@
 #include <aquamarine/backend/Null.hpp>
 #include <aquamarine/backend/Tab.hpp>
 #include <aquamarine/allocator/GBM.hpp>
+#include <iostream>
 #include <ranges>
 #include <sys/timerfd.h>
 #include <ctime>
@@ -171,7 +172,7 @@ bool Aquamarine::CBackend::start() {
         }
     }
 
-    if (!primaryAllocator && (implementations.empty() || implementations.at(0)->type() != AQ_BACKEND_NULL)) {
+    if (!primaryAllocator && (implementations.empty() || (implementations.at(0)->type() != AQ_BACKEND_NULL && implementations.at(0)->type() != AQ_BACKEND_TAB))) {
         log(AQ_LOG_CRITICAL, "Cannot open backend: no allocator available");
         return false;
     }

@@ -1012,7 +1012,7 @@ void Aquamarine::CDRMBackend::onReady() {
 
         // swapchain has to be created here because allocator is absent in connect if not ready
         auto primaryBackend  = primary ? primary : self;
-        c->output->swapchain = CSwapchain::create(backend->primaryAllocator, primaryBackend.lock());
+        c->output->swapchain = ISwapchain::createLegacy(backend->primaryAllocator, primaryBackend.lock());
         c->output->swapchain->reconfigure(SSwapchainOptions{.length = 0, .scanout = true, .multigpu = !!primary, .scanoutOutput = c->output}); // mark the swapchain for scanout
         c->output->needsFrame = true;
 
@@ -1493,7 +1493,7 @@ void Aquamarine::SDRMConnector::connect(drmModeConnector* connector) {
         return;
 
     auto primaryBackend = backend->primary ? backend->primary : backend;
-    output->swapchain   = CSwapchain::create(backend->backend->primaryAllocator, primaryBackend.lock());
+    output->swapchain   = ISwapchain::createLegacy(backend->backend->primaryAllocator, primaryBackend.lock());
     output->swapchain->reconfigure(SSwapchainOptions{.length = 0, .scanout = true, .multigpu = !!backend->primary, .scanoutOutput = output}); // mark the swapchain for scanout
     output->needsFrame = true;
     backend->backend->events.newOutput.emit(SP<IOutput>(output));
@@ -1710,7 +1710,7 @@ bool Aquamarine::CDRMOutput::commitState(bool onlyTest) {
 
             if (!mgpu.swapchain) {
                 TRACE(backend->backend->log(AQ_LOG_TRACE, "drm: No swapchain for blit, creating"));
-                mgpu.swapchain = CSwapchain::create(backend->rendererState.allocator, backend.lock());
+                mgpu.swapchain = ISwapchain::createLegacy(backend->rendererState.allocator, backend.lock());
             }
 
             auto OPTIONS = swapchain->currentOptions();
@@ -1892,7 +1892,7 @@ bool Aquamarine::CDRMOutput::setCursor(SP<IBuffer> buffer, const Vector2D& hotsp
 
             if (!mgpu.cursorSwapchain) {
                 TRACE(backend->backend->log(AQ_LOG_TRACE, "drm: No cursorSwapchain for blit, creating"));
-                mgpu.cursorSwapchain = CSwapchain::create(backend->rendererState.allocator, backend.lock());
+                mgpu.cursorSwapchain = ISwapchain::createLegacy(backend->rendererState.allocator, backend.lock());
             }
 
             const auto FORMAT = bufferType == eBufferType::BUFFER_TYPE_SHM ? buffer->shm().format : buffer->dmabuf().format;

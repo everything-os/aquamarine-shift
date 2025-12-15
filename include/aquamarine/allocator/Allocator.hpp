@@ -6,7 +6,7 @@
 
 namespace Aquamarine {
     class CBackend;
-    class CSwapchain;
+    class CLegacySwapchain;
 
     struct SAllocatorBufferParams {
         Hyprutils::Math::Vector2D size;
@@ -22,7 +22,7 @@ namespace Aquamarine {
     class IAllocator {
       public:
         virtual ~IAllocator()                                                                                                                                      = default;
-        virtual Hyprutils::Memory::CSharedPointer<IBuffer>  acquire(const SAllocatorBufferParams& params, Hyprutils::Memory::CSharedPointer<CSwapchain> swapchain) = 0;
+        virtual Hyprutils::Memory::CSharedPointer<IBuffer>  acquire(const SAllocatorBufferParams& params, Hyprutils::Memory::CSharedPointer<CLegacySwapchain> swapchain) = 0;
         virtual Hyprutils::Memory::CSharedPointer<CBackend> getBackend()                                                                                           = 0;
         virtual int                                         drmFD()                                                                                                = 0;
         virtual eAllocatorType                              type()                                                                                                 = 0;

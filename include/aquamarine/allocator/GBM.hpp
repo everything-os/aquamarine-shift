@@ -8,7 +8,7 @@ struct gbm_bo;
 namespace Aquamarine {
     class CGBMAllocator;
     class CBackend;
-    class CSwapchain;
+    class CLegacySwapchain;
 
     class CGBMBuffer : public IBuffer {
       public:
@@ -24,7 +24,7 @@ namespace Aquamarine {
         virtual void                                   endDataPtr();
 
       private:
-        CGBMBuffer(const SAllocatorBufferParams& params, Hyprutils::Memory::CWeakPointer<CGBMAllocator> allocator_, Hyprutils::Memory::CSharedPointer<CSwapchain> swapchain);
+        CGBMBuffer(const SAllocatorBufferParams& params, Hyprutils::Memory::CWeakPointer<CGBMAllocator> allocator_, Hyprutils::Memory::CSharedPointer<CLegacySwapchain> swapchain);
 
         Hyprutils::Memory::CWeakPointer<CGBMAllocator> allocator;
 
@@ -42,7 +42,7 @@ namespace Aquamarine {
         ~CGBMAllocator();
         static Hyprutils::Memory::CSharedPointer<CGBMAllocator> create(int drmfd_, Hyprutils::Memory::CWeakPointer<CBackend> backend_);
 
-        virtual Hyprutils::Memory::CSharedPointer<IBuffer>      acquire(const SAllocatorBufferParams& params, Hyprutils::Memory::CSharedPointer<CSwapchain> swapchain_);
+        virtual Hyprutils::Memory::CSharedPointer<IBuffer>      acquire(const SAllocatorBufferParams& params, Hyprutils::Memory::CSharedPointer<CLegacySwapchain> swapchain_);
         virtual Hyprutils::Memory::CSharedPointer<CBackend>     getBackend();
         virtual int                                             drmFD();
         virtual eAllocatorType                                  type();

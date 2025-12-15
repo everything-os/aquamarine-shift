@@ -5,7 +5,7 @@
 namespace Aquamarine {
     class CDRMDumbAllocator;
     class CBackend;
-    class CSwapchain;
+    class CLegacySwapchain;
 
     class CDRMDumbBuffer : public IBuffer {
       public:
@@ -22,7 +22,7 @@ namespace Aquamarine {
 
       private:
         CDRMDumbBuffer(const SAllocatorBufferParams& params, Hyprutils::Memory::CWeakPointer<CDRMDumbAllocator> allocator_,
-                       Hyprutils::Memory::CSharedPointer<CSwapchain> swapchain);
+                       Hyprutils::Memory::CSharedPointer<CLegacySwapchain> swapchain);
 
         Hyprutils::Memory::CWeakPointer<CDRMDumbAllocator> allocator;
 
@@ -44,7 +44,7 @@ namespace Aquamarine {
         ~CDRMDumbAllocator();
         static Hyprutils::Memory::CSharedPointer<CDRMDumbAllocator> create(int drmfd_, Hyprutils::Memory::CWeakPointer<CBackend> backend_);
 
-        virtual Hyprutils::Memory::CSharedPointer<IBuffer>          acquire(const SAllocatorBufferParams& params, Hyprutils::Memory::CSharedPointer<CSwapchain> swapchain_);
+        virtual Hyprutils::Memory::CSharedPointer<IBuffer>          acquire(const SAllocatorBufferParams& params, Hyprutils::Memory::CSharedPointer<CLegacySwapchain> swapchain_);
         virtual Hyprutils::Memory::CSharedPointer<CBackend>         getBackend();
         virtual int                                                 drmFD();
         virtual eAllocatorType                                      type();

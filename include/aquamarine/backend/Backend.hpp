@@ -90,7 +90,6 @@ namespace Aquamarine {
         virtual void                                                       onReady()                                  = 0;
         virtual std::vector<SDRMFormat>                                    getRenderFormats()                         = 0;
         virtual std::vector<SDRMFormat>                                    getCursorFormats()                         = 0;
-        virtual bool                                                       createOutput(const std::string& name = "") = 0; // "" means auto
         virtual Hyprutils::Memory::CSharedPointer<IAllocator>              preferredAllocator()                       = 0;
         virtual std::vector<SDRMFormat>                                    getRenderableFormats(); // empty = use getRenderFormats
         virtual std::vector<Hyprutils::Memory::CSharedPointer<IAllocator>> getAllocators()   = 0;

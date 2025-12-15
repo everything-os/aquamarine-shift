@@ -222,8 +222,8 @@ namespace Aquamarine {
         Hyprutils::Memory::CSharedPointer<std::function<void(void)>> frameIdle;
 
         struct {
-            Hyprutils::Memory::CSharedPointer<CSwapchain> swapchain;
-            Hyprutils::Memory::CSharedPointer<CSwapchain> cursorSwapchain;
+            Hyprutils::Memory::CSharedPointer<ISwapchain> swapchain;
+            Hyprutils::Memory::CSharedPointer<ISwapchain> cursorSwapchain;
         } mgpu;
 
         bool lastCommitNoBuffer = true;
@@ -365,7 +365,7 @@ namespace Aquamarine {
         virtual void                                                       onReady();
         virtual std::vector<SDRMFormat>                                    getRenderFormats();
         virtual std::vector<SDRMFormat>                                    getCursorFormats();
-        virtual bool                                                       createOutput(const std::string& name = "");
+        bool                                                       createOutput(const std::string& name = "");
         virtual Hyprutils::Memory::CSharedPointer<IAllocator>              preferredAllocator();
         virtual std::vector<SDRMFormat>                                    getRenderableFormats();
         virtual std::vector<Hyprutils::Memory::CSharedPointer<IAllocator>> getAllocators();
